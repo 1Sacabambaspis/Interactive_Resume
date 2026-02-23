@@ -22,8 +22,9 @@ const EQUIPPED_SKILLS = [
 ];
 
 // --- INLINE SVG SPRITES ---
-const ArcanePortalSprite = ({ colorHex }) => (
-  <svg viewBox="0 0 100 100" className="w-full h-full animate-[spin_8s_linear_infinite] drop-shadow-[0_0_10px_currentColor]" style={{ color: colorHex }}>
+const ArcanePortalSprite = ({ colorHex, scale }) => (
+  <svg viewBox="0 0 100 100" className="w-full h-full animate-[spin_8s_linear_infinite]" 
+       style={{ color: colorHex, transform: `scale(${scale})`, transition: 'transform 0.2s ease-out', filter: `drop-shadow(0 0 ${10 * scale}px currentColor)` }}>
     <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="10 5" />
     <polygon points="50,10 85,75 15,75" fill="none" stroke="currentColor" strokeWidth="2" className="animate-[pulse_2s_ease-in-out_infinite]" />
     <polygon points="50,90 85,25 15,25" fill="none" stroke="currentColor" strokeWidth="2" className="animate-[pulse_2s_ease-in-out_infinite_reverse]" />
@@ -33,16 +34,24 @@ const ArcanePortalSprite = ({ colorHex }) => (
 
 const PlayerSprite = () => (
   <svg viewBox="0 0 64 64" className="w-full h-full drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]">
-    <rect x="20" y="16" width="24" height="24" fill="#cbd5e1" rx="4" /> {/* Head */}
-    <rect x="24" y="24" width="16" height="6" fill="#0f172a" /> {/* Visor */}
-    <rect x="26" y="26" width="4" height="2" fill="#38bdf8" className="animate-pulse" /> {/* Glowing Eye */}
-    <path d="M16 40 L48 40 L44 64 L20 64 Z" fill="#334155" /> {/* Body */}
-    <rect x="12" y="40" width="8" height="16" fill="#475569" rx="2" /> {/* Arm L */}
-    <rect x="44" y="40" width="8" height="16" fill="#475569" rx="2" /> {/* Arm R */}
+    <rect x="20" y="16" width="24" height="24" fill="#cbd5e1" rx="4" />
+    <rect x="24" y="24" width="16" height="6" fill="#0f172a" />
+    <rect x="26" y="26" width="4" height="2" fill="#38bdf8" className="animate-pulse" />
+    <path d="M16 40 L48 40 L44 64 L20 64 Z" fill="#334155" />
+    <rect x="12" y="40" width="8" height="16" fill="#475569" rx="2" />
+    <rect x="44" y="40" width="8" height="16" fill="#475569" rx="2" />
   </svg>
 );
 
 export default function App() {
+  // CRITICAL FIX: The config hook is now safely inside the component!
+  const [config, setConfig] = useState({
+    rotateSkills: true,
+    weatherEffects: true,
+    particles: true,
+    muted: true // Set to true by default to prevent browser auto-play warnings
+  });
+
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [currentDungeon, setCurrentDungeon] = useState(DungeonModule.hub);
   const [uiState, setUiState] = useState('EXPLORING'); 
@@ -55,6 +64,14 @@ export default function App() {
   const [envData, setEnvData] = useState({ isNight: false, weatherType: 'CLEAR', timeString: '', loaded: false });
   const [githubCache, setGithubCache] = useState(null);
   const [isFetchingGithub, setIsFetchingGithub] = useState(false);
+
+  // Safely play sounds if the user has unmuted the app
+  const playSfx = (file, volume = 0.3) => {
+    if (config.muted) return;
+    const sfx = new Audio(`/audio/${file}.mp3`);
+    sfx.volume = volume;
+    sfx.play().catch(() => console.log("Audio play blocked by browser."));
+  };
 
   const playerRef = useRef({ 
     x: window.innerWidth * DungeonModule.hub.spawnPoint.rx, 
@@ -72,11 +89,11 @@ export default function App() {
     x: playerRef.current.x, y: playerRef.current.y, orbitAngle: 0, shakeX: 0, shakeY: 0, particles: [], rain: [] 
   });
 
-  // --- ROCK SOLID CLOSE FUNCTION ---
   const closeUI = () => {
     setUiState('EXPLORING');
     setActiveProject(null);
     setActiveInfo(null);
+    playSfx('close', 0.2); // Optional sound effect for closing
   };
 
   useEffect(() => {
@@ -121,6 +138,7 @@ export default function App() {
       if (buffer.join(',') === KONAMI_CODE.join(',')) {
         setEasterEggActive(true);
         cameraRef.current.trauma = 1.5;
+        playSfx('powerup', 0.5);
       }
     };
     const handleKeyUp = (e) => keysRef.current.delete(e.key.toLowerCase());
@@ -134,6 +152,7 @@ export default function App() {
 
   const fetchGitHubActivity = async () => {
     setUiState('VIEW_GITHUB');
+    playSfx('open', 0.3);
     if (githubCache) return;
     setIsFetchingGithub(true);
     try {
@@ -152,16 +171,19 @@ export default function App() {
     setUiState('HACKING');
     setHackingLogs([]);
     for (let i = 0; i < HACKING_LOG_TEMPLATES.length; i++) {
+      playSfx('typing', 0.2); // Play typing sound per log
       await new Promise(res => setTimeout(res, 250)); 
       setHackingLogs(prev => [...prev, HACKING_LOG_TEMPLATES[i]]);
     }
     await new Promise(res => setTimeout(res, 400)); 
+    playSfx('success', 0.4); // Access granted sound
     setActiveProject(ProjectRegistry[projectId]);
     setUiState('VIEW_PROJECT');
   };
 
   const executeTrigger = (trigger) => {
     if (trigger.type === "DUNGEON_EXIT") {
+      playSfx('warp', 0.4);
       const nextDungeon = DungeonModule[trigger.targetDungeon];
       setCurrentDungeon(nextDungeon);
       playerRef.current.x = windowSize.width * nextDungeon.spawnPoint.rx;
@@ -172,11 +194,18 @@ export default function App() {
     else if (trigger.type === "PROJECT_TERMINAL") triggerHackingSequence(trigger.projectId);
     else if (trigger.type === "GITHUB_RACK") fetchGitHubActivity();
     else if (trigger.type === "INFO_BOARD") {
+      playSfx('open', 0.3);
       setActiveInfo(InfoRegistry[trigger.infoId]);
       setUiState('VIEW_INFO');
     }
-    else if (trigger.type === "EXTERNAL_LINK") window.open(trigger.url, '_blank');
-    else if (trigger.type === "CONTACT_INFO") setUiState('VIEW_CONTACT');
+    else if (trigger.type === "EXTERNAL_LINK") {
+      playSfx('open', 0.3);
+      window.open(trigger.url, '_blank');
+    }
+    else if (trigger.type === "CONTACT_INFO") {
+      playSfx('open', 0.3);
+      setUiState('VIEW_CONTACT');
+    }
   };
 
   const gameLoop = () => {
@@ -198,14 +227,16 @@ export default function App() {
     p.vx *= p.friction; p.vy *= p.friction;
     p.x += p.vx; p.y += p.vy;
 
-    if (isMoving && Math.random() > 0.6) {
+    // Conditionally render footstep particles
+    if (config.particles && isMoving && Math.random() > 0.6) {
       particlesRef.current.push({ id: Math.random(), x: p.x + (Math.random() * 30 - 15), y: p.y + 25, life: 1.0 });
     }
     particlesRef.current = particlesRef.current.filter(part => part.life > 0).map(part => {
       part.life -= 0.05; part.y -= 0.5; return part;
     });
 
-    if (envData.weatherType === 'RAIN') {
+    // Conditionally render weather physics
+    if (config.weatherEffects && envData.weatherType === 'RAIN') {
       if (Math.random() > 0.2) { 
         rainRef.current.push({ id: Math.random(), x: Math.random() * windowSize.width, y: -20, speed: 15 + Math.random() * 10, length: 10 + Math.random() * 20 });
       }
@@ -221,7 +252,10 @@ export default function App() {
     if (p.y < 40) { p.y = 40; if (p.vy < -3) cam.trauma = 0.3; p.vy = 0; }
     if (p.y > windowSize.height - 40) { p.y = windowSize.height - 40; if (p.vy > 3) cam.trauma = 0.3; p.vy = 0; }
 
-    p.orbitAngle += 0.05;
+    // Settings Toggle: Spin or track behind player
+    if (config.rotateSkills) {
+      p.orbitAngle += 0.05;
+    }
 
     if (cam.trauma > 0) {
       cam.offsetX = (Math.random() - 0.5) * 20 * cam.trauma;
@@ -257,11 +291,11 @@ export default function App() {
   };
 
   useEffect(() => {
+    // We add 'config' to the dependency array so the game loop respects toggles instantly
     animationRef.current = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animationRef.current);
-  }, [uiState, currentDungeon, windowSize, envData.weatherType]); 
+  }, [uiState, currentDungeon, windowSize, envData.weatherType, config]); 
 
-  // --- BACKGROUND THEME LOGIC ---
   const bgClass = envData.isNight ? 'bg-gradient-to-b from-gray-900 to-black' : 'bg-gradient-to-b from-sky-400 to-sky-200';
 
   return (
@@ -271,21 +305,18 @@ export default function App() {
       {/* 1. LAYERED BACKGROUND SPRITES (Sky / Sun / Moon) */}
       <div className="absolute inset-0 z-0">
         {envData.isNight ? (
-          // Moon & Stars
           <>
             <div className="absolute top-10 right-20 w-24 h-24 bg-slate-200 rounded-full shadow-[0_0_50px_#f8fafc] opacity-80"></div>
             <div className="absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[length:50px_50px] opacity-30"></div>
           </>
         ) : (
-          // Sun
           <div className="absolute top-10 right-20 w-32 h-32 bg-yellow-300 rounded-full shadow-[0_0_80px_#fde047] opacity-90 animate-[pulse_4s_ease-in-out_infinite]"></div>
         )}
       </div>
 
-      {/* 2. ATMOSPHERIC CLOUDS (Parallax) */}
-      {(envData.weatherType === 'CLOUDY' || envData.weatherType === 'RAIN') && (
+      {/* 2. ATMOSPHERIC CLOUDS (Parallax) conditionally rendered by settings */}
+      {config.weatherEffects && (envData.weatherType === 'CLOUDY' || envData.weatherType === 'RAIN') && (
         <div className="absolute inset-0 pointer-events-none z-10 opacity-40 overflow-hidden">
-          {/* Cloud layers using CSS generated shapes */}
           <div className="absolute top-20 left-10 w-64 h-20 bg-white rounded-full blur-xl opacity-50 animate-[slide_20s_linear_infinite]"></div>
           <div className="absolute top-40 right-20 w-96 h-24 bg-white rounded-full blur-xl opacity-40 animate-[slide_35s_linear_infinite_reverse]"></div>
         </div>
@@ -300,9 +331,9 @@ export default function App() {
       </div>
 
       {/* 4. UI HUD */}
-      <div className="absolute top-6 left-6 z-50 flex flex-col gap-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+      <div className="absolute top-6 left-6 z-50 flex flex-col gap-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] pointer-events-none">
         <div className="text-white font-bold tracking-widest uppercase text-3xl drop-shadow-[0_0_8px_currentColor]">{currentDungeon.name}</div>
-        <div className="flex gap-4 text-slate-200 text-sm bg-black/50 px-3 py-1 rounded-md border border-slate-600">
+        <div className="flex gap-4 text-slate-200 text-sm bg-black/50 px-3 py-1 rounded-md border border-slate-600 w-fit backdrop-blur-sm">
            <span>SYS_TIME: <span className="text-teal-400">{envData.timeString}</span></span>
            <span>ATMOSPHERE: <span className="text-teal-400">{envData.weatherType}</span></span>
         </div>
@@ -311,10 +342,14 @@ export default function App() {
       {/* 5. GAME ENTITIES */}
       <div className="absolute inset-0 z-20">
         
-        {/* Dynamic Sprited Portals */}
+        {/* Dynamic Sprited Portals with Proximity Scaling */}
         {currentDungeon.triggers.map(t => {
           const absX = t.rx * windowSize.width;
           const absY = t.ry * windowSize.height;
+          
+          // Calculate distance from player for dynamic glow/scaling
+          const dist = Math.sqrt(Math.pow(renderState.x - absX, 2) + Math.pow(renderState.y - absY, 2));
+          const proximityScale = Math.max(1, 1.5 - dist / 300); // Scales up as you get closer
           
           let hexColor = '#14b8a6'; // teal
           if (t.type === 'DUNGEON_EXIT') hexColor = '#a855f7'; // purple
@@ -323,10 +358,21 @@ export default function App() {
           
           return (
             <div key={t.id} className="absolute flex items-center justify-center transition-transform hover:scale-110"
-                 style={{ width: t.radius * 2, height: t.radius * 2, left: absX - t.radius, top: absY - t.radius }}>
-              <ArcanePortalSprite colorHex={hexColor} />
+                 style={{ width: t.radius * 2, height: t.radius * 2, left: absX - t.radius, top: absY - t.radius, zIndex: proximityScale > 1.2 ? 25 : 10 }}>
+              <ArcanePortalSprite colorHex={hexColor} scale={proximityScale} />
             </div>
           );
+        })}
+
+        {/* Decor Renderer (To fill empty space if added to dungeons.js) */}
+        {currentDungeon.decor && currentDungeon.decor.map(d => {
+          const absX = d.rx * windowSize.width;
+          const absY = d.ry * windowSize.height;
+          return (
+            <div key={d.id} className="absolute text-slate-500/30 text-6xl pointer-events-none" style={{ left: absX, top: absY }}>
+               {d.type === 'SERVER_RACK' ? '🖧' : d.type === 'PILLAR' ? '🏛️' : '✧'}
+            </div>
+          )
         })}
 
         {/* Dust Particles */}
@@ -338,11 +384,10 @@ export default function App() {
         <div className="absolute w-16 h-16 transition-none z-30" style={{ left: renderState.x - 32, top: renderState.y - 32 }}>
           <PlayerSprite />
           
-          
           {/* Orbiting Familiars */}
           {EQUIPPED_SKILLS.map(skill => {
-            const x = Math.cos(renderState.orbitAngle + skill.offset) * 85; // Increased to 85
-            const y = Math.sin(renderState.orbitAngle + skill.offset) * 85; // Increased to 85
+            const x = Math.cos(renderState.orbitAngle + skill.offset) * 85; 
+            const y = Math.sin(renderState.orbitAngle + skill.offset) * 85; 
             return (
               <motion.div key={skill.id} className={`absolute w-10 h-10 rounded-full bg-black/90 border-2 flex items-center justify-center ${skill.color} shadow-[0_0_15px_currentColor]`}
                    style={{ left: 12 + x, top: 12 + y }} title={skill.name} whileHover={{ scale: 1.3, zIndex: 50 }}>
@@ -353,11 +398,45 @@ export default function App() {
         </div>
       </div>
 
+      {/* BOTTOM LEFT: CONTROL HINTS */}
+      <div className="absolute bottom-6 left-6 z-50 pointer-events-none opacity-60 text-xs font-bold tracking-[0.1em] border-l-2 border-teal-500/50 pl-3">
+        <div className="flex flex-col gap-1 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+          <p className="text-white"><span className="text-teal-400">[WASD]</span> MOVE SYSTEM</p>
+          <p className="text-white"><span className="text-teal-400">[F]</span> ACCESS TERMINAL</p>
+          <p className="text-white"><span className="text-teal-400">[ESC]</span> CLOSE UI</p>
+        </div>
+      </div>
+
+      {/* BOTTOM RIGHT: SYSTEM SETTINGS TRAY */}
+      <div className="absolute bottom-6 right-6 z-50 flex gap-3 drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">
+        <button 
+          onClick={() => setConfig(prev => ({...prev, weatherEffects: !prev.weatherEffects}))}
+          className={`px-3 py-2 border ${config.weatherEffects ? 'border-sky-400 text-sky-400 bg-sky-900/40' : 'border-slate-600 text-slate-500 bg-black/40'} rounded-md hover:bg-white/10 transition-colors backdrop-blur-sm`}
+          title="Toggle Weather Effects"
+        >
+          {config.weatherEffects ? '☁️ ON' : '☁️ OFF'}
+        </button>
+        <button 
+          onClick={() => setConfig(prev => ({...prev, rotateSkills: !prev.rotateSkills}))}
+          className={`px-3 py-2 border ${config.rotateSkills ? 'border-teal-400 text-teal-400 bg-teal-900/40' : 'border-slate-600 text-slate-500 bg-black/40'} rounded-md hover:bg-white/10 transition-colors backdrop-blur-sm`}
+          title="Toggle Skill Orbit"
+        >
+          {config.rotateSkills ? '🌀 ORBIT' : '🛑 FIXED'}
+        </button>
+        <button 
+          onClick={() => setConfig(prev => ({...prev, muted: !prev.muted}))}
+          className={`px-3 py-2 border ${!config.muted ? 'border-purple-400 text-purple-400 bg-purple-900/40' : 'border-slate-600 text-slate-500 bg-black/40'} rounded-md hover:bg-white/10 transition-colors backdrop-blur-sm`}
+          title="Toggle Audio"
+        >
+          {!config.muted ? '🔊 AUDIO' : '🔇 MUTE'}
+        </button>
+      </div>
+
       {/* Interaction Tooltip */}
       <AnimatePresence>
         {activeTrigger && uiState === 'EXPLORING' && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-            className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-black/90 px-8 py-4 border-2 border-slate-600 rounded-lg text-teal-400 z-50 font-bold tracking-widest text-lg shadow-[0_0_30px_rgba(20,184,166,0.3)]">
+            className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/95 px-8 py-4 border-2 border-slate-600 rounded-lg text-teal-400 z-50 font-bold tracking-widest text-lg shadow-[0_0_30px_rgba(20,184,166,0.4)] pointer-events-none">
             Press [F] : {activeTrigger.label}
           </motion.div>
         )}
@@ -413,7 +492,6 @@ export default function App() {
                 {activeProject.techStack.map(tech => <span key={tech} className="bg-slate-800 text-teal-300 px-4 py-2 rounded-md border border-slate-700 shadow-md">{tech}</span>)}
               </div>
               
-              {/* Full AI Credit Board */}
               {activeProject.aiCredits && (
                 <section className="mt-8 bg-purple-900/10 border border-purple-500/30 rounded-lg p-6 shadow-[0_0_20px_rgba(168,85,247,0.1)]">
                   <h3 className="text-xl text-purple-400 font-bold mb-4 uppercase tracking-widest flex items-center gap-3">

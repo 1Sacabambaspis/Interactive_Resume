@@ -5,6 +5,12 @@ export const DungeonModule = {
       { id: "t_proj", type: "DUNGEON_EXIT", targetDungeon: "projects_zone", rx: 0.5, ry: 0.2, radius: 50, label: "Enter Project Archives" },
       { id: "t_edu", type: "DUNGEON_EXIT", targetDungeon: "education_zone", rx: 0.2, ry: 0.8, radius: 50, label: "Enter Educations" },
       { id: "t_soc", type: "DUNGEON_EXIT", targetDungeon: "socials_zone", rx: 0.8, ry: 0.8, radius: 50, label: "Enter Comms & Socials" }
+      
+    ],
+    decor: [
+    { id: 'd1', type: 'PILLAR', rx: 0.2, ry: 0.2 },
+    { id: 'd2', type: 'PILLAR', rx: 0.8, ry: 0.2 },
+    { id: 'd3', type: 'FLOOR_SEAL', rx: 0.5, ry: 0.5 }, // A large geometric pattern under the player
     ]
   },
   projects_zone: {
@@ -33,4 +39,5 @@ export const DungeonModule = {
       { id: "exit", type: "DUNGEON_EXIT", targetDungeon: "hub", rx: 0.5, ry: 0.85, radius: 50, label: "Return to Hub" }
     ]
   }
+  
 };

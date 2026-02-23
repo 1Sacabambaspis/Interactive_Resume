@@ -15,7 +15,6 @@ The React Compiler is not enabled on this template because of its impact on dev 
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
 
-
 # 🎮 Chong Jia Ze - Interactive Developer Portfolio
 
 Welcome to my interactive resume! Instead of a standard PDF, I built a 2D continuous-movement web environment to showcase my skills in **Cloud Computing and Cybersecurity**.
@@ -24,7 +23,7 @@ Explore my "Main Portfolio" hub to interact with my projects, view my academic h
 
 ## 🚀 Live Demo
 
-**[Insert your Vercel URL here]**
+**[[chongjiaze-resume.vercel.app](https://chongjiaze-resume.vercel.app/)]**
 
 ---
 
