@@ -90,9 +90,9 @@ export default function App() {
   const cameraRef = useRef({ trauma: 0, offsetX: 0, offsetY: 0 });
   const particlesRef = useRef([]);
   const rainRef = useRef([]); 
-  const enemiesRef = useRef([]);      // New: Rogue Bugs
-  const projectilesRef = useRef([]);  // New: Skill Shots
-  const explosionsRef = useRef([]);   // New: Blast Rings
+  const enemiesRef = useRef([]);      // For the Bug Shooter Game
+  const projectilesRef = useRef([]);  
+  const explosionsRef = useRef([]);   
   const mouseRef = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
   
   const keysRef = useRef(new Set());
@@ -146,24 +146,20 @@ export default function App() {
       if (uiState !== 'EXPLORING' || currentDungeon.id !== 'hub') return;
       
       const px = playerRef.current.x;
-      const py = playerRef.current.y - 16; // Shoot from chest height
+      const py = playerRef.current.y - 16;
       const mx = mouseRef.current.x;
       const my = mouseRef.current.y;
       
       const angle = Math.atan2(my - py, mx - px);
-      const speed = 12; // Fast projectiles
+      const speed = 12;
       const randomSkill = EQUIPPED_SKILLS[Math.floor(Math.random() * EQUIPPED_SKILLS.length)];
       
       projectilesRef.current.push({
-        id: Math.random(),
-        x: px, y: py,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 100, // Frames until it despawns
-        skill: randomSkill
+        id: Math.random(), x: px, y: py,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        life: 100, skill: randomSkill
       });
-      
-      playSfx('typing', 0.2); // Double up the typing sound as a "laser" sound if you don't have a shoot sound
+      playSfx('typing', 0.2); 
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -222,8 +218,54 @@ export default function App() {
     };
   }, []);
 
-  const fetchGitHubActivity = async () => { /* ... unchanged ... */ };
-  const triggerHackingSequence = async (projectId) => { /* ... unchanged ... */ };
+  const fetchGitHubActivity = async () => {
+    setUiState('VIEW_GITHUB');
+    playSfx('open', 0.3);
+    if (githubCache) return;
+    setIsFetchingGithub(true);
+    try {
+      const res = await fetch("https://api.github.com/users/1Sacabambaspis/events/public");
+      if (!res.ok) throw new Error("GitHub API Rate Limited");
+      const data = await res.json();
+      const pushEvents = data.filter(e => e.type === 'PushEvent');
+      setGithubCache({ score: pushEvents.length, active: pushEvents.length > 0, lastUpdated: new Date().toLocaleTimeString() });
+    } catch (e) {
+      setGithubCache({ score: 5, active: true, lastUpdated: "Offline Cache" });
+    }
+    setIsFetchingGithub(false);
+  };
+
+  const triggerHackingSequence = async (projectId) => {
+    setUiState('HACKING');
+    setHackingLogs([]);
+    for (let i = 0; i < HACKING_LOG_TEMPLATES.length; i++) {
+      playSfx('typing', 0.2); 
+      await new Promise(res => setTimeout(res, 250)); 
+      setHackingLogs(prev => [...prev, HACKING_LOG_TEMPLATES[i]]);
+    }
+    await new Promise(res => setTimeout(res, 400)); 
+    playSfx('success', 0.4); 
+
+    // CRITICAL FIX: Robust Data Fetching (Prevents soft-locking)
+    let foundProject = null;
+    if (Array.isArray(ProjectRegistry)) {
+      foundProject = ProjectRegistry.find(p => p.id === projectId);
+    } else if (ProjectRegistry) {
+      foundProject = ProjectRegistry[projectId];
+    }
+    
+    if (!foundProject) {
+       console.error(`ERROR: Project ID "${projectId}" not found.`);
+       foundProject = {
+         title: "404 NOT FOUND", subtitle: "Data Parse Error", role: "N/A", 
+         architecture: `Make sure the ID "${projectId}" matches your Data/Projects.js keys exactly.`,
+         impact: ["Data unlinked"], techStack: ["Error Handling"], githubLink: ""
+       };
+    }
+
+    setActiveProject(foundProject);
+    setUiState('VIEW_PROJECT');
+  };
 
   const executeTrigger = (trigger) => {
     if (trigger.type === "DUNGEON_EXIT") {
@@ -234,7 +276,6 @@ export default function App() {
       playerRef.current.y = windowSize.height * nextDungeon.spawnPoint.ry;
       playerRef.current.vx = 0; playerRef.current.vy = 0;
       cameraRef.current.trauma = 0.5; 
-      // Clear combat arrays when leaving the hub
       enemiesRef.current = []; projectilesRef.current = []; explosionsRef.current = [];
     } 
     else if (trigger.type === "PROJECT_TERMINAL") triggerHackingSequence(trigger.projectId);
@@ -280,58 +321,49 @@ export default function App() {
       part.life -= 0.05; part.y -= 0.5; return part;
     });
 
-    // --- COMBAT LOGIC (Only runs in the Hub) ---
+    // --- COMBAT LOGIC ---
     if (currentDungeon.id === 'hub') {
-      // 1. Spawner
-      if (Math.random() < 0.015 && enemiesRef.current.length < 5) { // Spawn rate and max cap
+      if (Math.random() < 0.015 && enemiesRef.current.length < 5) { 
         const edge = Math.floor(Math.random() * 4);
         let ex, ey;
-        if (edge === 0) { ex = Math.random() * windowSize.width; ey = -50; } // Top
-        if (edge === 1) { ex = Math.random() * windowSize.width; ey = windowSize.height + 50; } // Bottom
-        if (edge === 2) { ex = -50; ey = Math.random() * windowSize.height; } // Left
-        if (edge === 3) { ex = windowSize.width + 50; ey = Math.random() * windowSize.height; } // Right
+        if (edge === 0) { ex = Math.random() * windowSize.width; ey = -50; } 
+        if (edge === 1) { ex = Math.random() * windowSize.width; ey = windowSize.height + 50; } 
+        if (edge === 2) { ex = -50; ey = Math.random() * windowSize.height; } 
+        if (edge === 3) { ex = windowSize.width + 50; ey = Math.random() * windowSize.height; } 
         enemiesRef.current.push({ id: Math.random(), x: ex, y: ey, speed: 1 + Math.random() });
       }
 
-      // 2. Enemy Movement (Crawling towards player)
       enemiesRef.current.forEach(enemy => {
         const angle = Math.atan2(p.y - enemy.y, p.x - enemy.x);
         enemy.x += Math.cos(angle) * enemy.speed;
         enemy.y += Math.sin(angle) * enemy.speed;
       });
 
-      // 3. Projectile Movement
       projectilesRef.current = projectilesRef.current.filter(proj => proj.life > 0);
       projectilesRef.current.forEach(proj => {
-        proj.x += proj.vx;
-        proj.y += proj.vy;
-        proj.life--;
+        proj.x += proj.vx; proj.y += proj.vy; proj.life--;
       });
 
-      // 4. Collision Detection (Projectiles vs Enemies)
       for (let i = projectilesRef.current.length - 1; i >= 0; i--) {
         const proj = projectilesRef.current[i];
         let hit = false;
         for (let j = enemiesRef.current.length - 1; j >= 0; j--) {
           const enemy = enemiesRef.current[j];
           const dist = Math.hypot(proj.x - enemy.x, proj.y - enemy.y);
-          if (dist < 30) { // Collision Radius
+          if (dist < 30) { 
             explosionsRef.current.push({ id: Math.random(), x: enemy.x, y: enemy.y, life: 1.0 });
-            playSfx('warp', 0.2); // Double up the warp sound for an explosion
+            playSfx('warp', 0.2); 
             enemiesRef.current.splice(j, 1);
-            hit = true;
-            break; 
+            hit = true; break; 
           }
         }
-        if (hit) projectilesRef.current.splice(i, 1); // Destroy bullet if it hit
+        if (hit) projectilesRef.current.splice(i, 1); 
       }
     }
 
-    // 5. Explosion Fading
     explosionsRef.current = explosionsRef.current.filter(exp => exp.life > 0);
     explosionsRef.current.forEach(exp => { exp.life -= 0.04; });
 
-    // Weather Fallback
     if (activeWeather === 'RAIN') {
       if (Math.random() > 0.2) { 
         rainRef.current.push({ id: Math.random(), x: Math.random() * windowSize.width, y: -20, speed: 15 + Math.random() * 10, length: 10 + Math.random() * 20 });
@@ -343,7 +375,6 @@ export default function App() {
       rainRef.current = []; 
     }
 
-    // Boundaries
     if (p.x < 40) { p.x = 40; if (p.vx < -3) cam.trauma = 0.3; p.vx = 0; }
     if (p.x > windowSize.width - 40) { p.x = windowSize.width - 40; if (p.vx > 3) cam.trauma = 0.3; p.vx = 0; }
     if (p.y < 40) { p.y = 40; if (p.vy < -3) cam.trauma = 0.3; p.vy = 0; }
@@ -409,7 +440,7 @@ export default function App() {
       
       {/* 1. LAYERED BACKGROUND SPRITES */}
       <div className="absolute inset-0 z-0">
-        {/* ENHANCED DOTTED GRID BACKGROUND */}
+        {/* DOTTED GRID BACKGROUND */}
         <div className={`absolute inset-0 bg-[radial-gradient(${activeNightMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'}_2px,transparent_2px)] bg-[length:40px_40px]`}></div>
         
         {activeNightMode ? (
@@ -465,7 +496,6 @@ export default function App() {
       {/* 6. GAME ENTITIES & COMBAT */}
       <div className="absolute inset-0 z-20 pointer-events-none">
         
-        {/* Dynamic Sprited Portals */}
         {currentDungeon.triggers.map(t => {
           const absX = t.rx * windowSize.width;
           const absY = t.ry * windowSize.height;
@@ -486,7 +516,7 @@ export default function App() {
           );
         })}
 
-        {/* COMBAT: Render Bugs (Enemies) */}
+        {/* Render Bugs (Enemies) */}
         {renderState.enemies.map(enemy => (
            <div key={enemy.id} className="absolute w-8 h-8 -ml-4 -mt-4 bg-red-600 rounded-sm shadow-[0_0_20px_#ef4444] flex items-center justify-center animate-pulse z-20"
                 style={{ left: enemy.x, top: enemy.y }}>
@@ -494,7 +524,7 @@ export default function App() {
            </div>
         ))}
 
-        {/* COMBAT: Render Skill Projectiles */}
+        {/* Render Skill Projectiles */}
         {renderState.projectiles.map(proj => (
            <div key={proj.id} className={`absolute w-6 h-6 -ml-3 -mt-3 flex items-center justify-center ${proj.skill.color} drop-shadow-[0_0_10px_currentColor] z-20`} 
                 style={{ left: proj.x, top: proj.y }}>
@@ -502,13 +532,12 @@ export default function App() {
            </div>
         ))}
 
-        {/* COMBAT: Render Explosions */}
+        {/* Render Explosions */}
         {renderState.explosions.map(exp => (
            <div key={exp.id} className="absolute w-20 h-20 -ml-10 -mt-10 border-4 border-red-500 rounded-full z-20" 
                 style={{ left: exp.x, top: exp.y, transform: `scale(${2.5 - exp.life})`, opacity: exp.life }} />
         ))}
 
-        {/* Dust Particles */}
         {renderState.particles.map(p => (
           <div key={p.id} className={`absolute w-2 h-2 rounded-full shadow-[0_0_5px_currentColor] ${activeNightMode ? 'bg-slate-200 text-white' : 'bg-slate-500 text-slate-500'}`} style={{ left: p.x, top: p.y, opacity: p.life }} />
         ))}
@@ -520,7 +549,8 @@ export default function App() {
           {easterEggActive ? (
             <div className="relative w-full h-full animate-bounce">
               <SacabambaspisSprite />
-              <div className="absolute -top-24 left-1/2 -translate-x-1/2 text-cyan-300 font-black tracking-widest text-2xl whitespace-nowrap animate-pulse drop-shadow-[0_0_10px_currentColor] z-50">
+              {/* THE HIRE ME FIX: Shifted way higher up, bigger text, and absolute z-index to pop above skills */}
+              <div className="absolute -top-24 left-1/2 -translate-x-1/2 text-cyan-300 font-black tracking-widest text-2xl whitespace-nowrap animate-pulse drop-shadow-[0_0_10px_currentColor] z-[999]">
                 &lt; HIRE ME /&gt;
               </div>
             </div>
@@ -569,7 +599,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* --- UI MODALS (Unchanged logic, just dynamically applying dark/light backgrounds) --- */}
+      {/* --- UI MODALS (Dynamically text-colored based on Theme) --- */}
       {/* 1. Hacking Modal */}
       <AnimatePresence>
         {uiState === 'HACKING' && (
