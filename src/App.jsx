@@ -21,7 +21,6 @@ const EQUIPPED_SKILLS = [
   { id: 'tailwind', name: 'Tailwind CSS', icon: <SiTailwindcss size={18} />, color: 'text-sky-400 border-sky-400', offset: (Math.PI * 2) * (6 / 7) }
 ];
 
-// --- INLINE SVG SPRITES ---
 const ArcanePortalSprite = ({ colorHex, scale }) => (
   <svg viewBox="0 0 100 100" className="w-full h-full animate-[spin_8s_linear_infinite]" 
        style={{ color: colorHex, transform: `scale(${scale})`, transition: 'transform 0.2s ease-out', filter: `drop-shadow(0 0 ${10 * scale}px currentColor)` }}>
@@ -56,11 +55,13 @@ const SacabambaspisSprite = () => (
 );
 
 export default function App() {
+  // UPGRADED SETTINGS: Added manual overrides
   const [config, setConfig] = useState({
     rotateSkills: true,
-    weatherEffects: true,
     particles: true,
-    muted: true 
+    muted: true,
+    themeOverride: 'AUTO', // 'AUTO', 'LIGHT', 'DARK'
+    weatherOverride: 'AUTO' // 'AUTO', 'CLEAR', 'CLOUDY', 'RAIN'
   });
 
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -76,7 +77,10 @@ export default function App() {
   const [githubCache, setGithubCache] = useState(null);
   const [isFetchingGithub, setIsFetchingGithub] = useState(false);
 
-  // Audio Engine Refs
+  // Calculate actual current environment based on overrides
+  const activeNightMode = config.themeOverride === 'AUTO' ? envData.isNight : config.themeOverride === 'DARK';
+  const activeWeather = config.weatherOverride === 'AUTO' ? envData.weatherType : config.weatherOverride;
+
   const ambientAudioRef = useRef(null);
 
   useEffect(() => {
@@ -95,7 +99,7 @@ export default function App() {
     if (config.muted) return;
     const sfx = new Audio(`/audio/${file}.mp3`);
     sfx.volume = volume;
-    sfx.play().catch(() => console.log("Audio play blocked by browser."));
+    sfx.play().catch(() => {});
   };
 
   const playerRef = useRef({ 
@@ -259,7 +263,8 @@ export default function App() {
       part.life -= 0.05; part.y -= 0.5; return part;
     });
 
-    if (config.weatherEffects && envData.weatherType === 'RAIN') {
+    // Modified to use the manual override weather state
+    if (activeWeather === 'RAIN') {
       if (Math.random() > 0.2) { 
         rainRef.current.push({ id: Math.random(), x: Math.random() * windowSize.width, y: -20, speed: 15 + Math.random() * 10, length: 10 + Math.random() * 20 });
       }
@@ -275,9 +280,7 @@ export default function App() {
     if (p.y < 40) { p.y = 40; if (p.vy < -3) cam.trauma = 0.3; p.vy = 0; }
     if (p.y > windowSize.height - 40) { p.y = windowSize.height - 40; if (p.vy > 3) cam.trauma = 0.3; p.vy = 0; }
 
-    if (config.rotateSkills) {
-      p.orbitAngle += 0.05;
-    }
+    if (config.rotateSkills) p.orbitAngle += 0.05;
 
     if (cam.trauma > 0) {
       cam.offsetX = (Math.random() - 0.5) * 20 * cam.trauma;
@@ -315,62 +318,79 @@ export default function App() {
   useEffect(() => {
     animationRef.current = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animationRef.current);
-  }, [uiState, currentDungeon, windowSize, envData.weatherType, config]); 
+  }, [uiState, currentDungeon, windowSize, activeWeather, config]); 
 
-  const bgClass = envData.isNight ? 'bg-gradient-to-b from-gray-900 to-black' : 'bg-gradient-to-b from-sky-400 to-sky-200';
+  const bgClass = activeNightMode ? 'bg-slate-950' : 'bg-slate-200';
+  const textClass = activeNightMode ? 'text-white' : 'text-slate-900';
+
+  // State Cyclers for HUD
+  const cycleTheme = () => {
+    const modes = ['AUTO', 'LIGHT', 'DARK'];
+    setConfig(p => ({ ...p, themeOverride: modes[(modes.indexOf(p.themeOverride) + 1) % 3] }));
+  };
+  const cycleWeather = () => {
+    const modes = ['AUTO', 'CLEAR', 'CLOUDY', 'RAIN'];
+    setConfig(p => ({ ...p, weatherOverride: modes[(modes.indexOf(p.weatherOverride) + 1) % 4] }));
+  };
 
   return (
-    <div className={`w-screen h-screen ${bgClass} font-mono text-white selection:bg-teal-500 overflow-hidden relative`}
+    <div className={`w-screen h-screen ${bgClass} ${textClass} font-mono selection:bg-teal-500 overflow-hidden relative transition-colors duration-1000`}
          style={{ transform: `translate(${renderState.shakeX}px, ${renderState.shakeY}px)` }}>
       
       {/* 1. LAYERED BACKGROUND SPRITES (Sky / Sun / Moon) */}
       <div className="absolute inset-0 z-0">
-        {envData.isNight ? (
-          <>
-            <div className="absolute top-10 right-20 w-24 h-24 bg-slate-200 rounded-full shadow-[0_0_50px_#f8fafc] opacity-80"></div>
-            <div className="absolute inset-0 bg-[radial-gradient(white_1px,transparent_1px)] bg-[length:50px_50px] opacity-30"></div>
-          </>
+        {/* Dot Grid Pattern for Tech Vibe */}
+        <div className={`absolute inset-0 bg-[radial-gradient(${activeNightMode ? 'white' : 'black'}_1px,transparent_1px)] bg-[length:50px_50px] opacity-10`}></div>
+        
+        {activeNightMode ? (
+          <div className="absolute top-10 right-20 w-24 h-24 bg-slate-200 rounded-full shadow-[0_0_50px_#f8fafc] opacity-80"></div>
         ) : (
-          <div className="absolute top-10 right-20 w-32 h-32 bg-yellow-300 rounded-full shadow-[0_0_80px_#fde047] opacity-90 animate-[pulse_4s_ease-in-out_infinite]"></div>
+          <div className="absolute top-10 right-20 w-32 h-32 bg-yellow-400 rounded-full shadow-[0_0_80px_#facc15] opacity-90 animate-[pulse_4s_ease-in-out_infinite]"></div>
         )}
       </div>
 
-      {/* 2. DECORATIVE LIGHTING ORBS */}
-      <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
-        {[1, 2, 3, 4, 5].map(orb => (
-          <div key={orb} 
-               className="absolute w-32 h-32 bg-teal-500/10 rounded-full blur-2xl mix-blend-screen"
-               style={{
-                 left: `${Math.random() * 100}%`,
-                 top: `${Math.random() * 100}%`,
-                 animation: `slide ${20 + Math.random() * 20}s linear infinite alternate${Math.random() > 0.5 ? '-reverse' : ''}`
-               }} 
-          />
-        ))}
-      </div>
+      {/* 2. CLOUD INFRASTRUCTURE: NETWORK TOPOLOGY LINES */}
+      {/* Replaces the random orbs/emojis with clean data lines connecting the portals */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 opacity-30">
+        {currentDungeon.triggers.map(t => {
+          const startX = windowSize.width * currentDungeon.spawnPoint.rx;
+          const startY = windowSize.height * currentDungeon.spawnPoint.ry;
+          const endX = t.rx * windowSize.width;
+          const endY = t.ry * windowSize.height;
+          return (
+            <line key={`line-${t.id}`} x1={startX} y1={startY} x2={endX} y2={endY} 
+                  stroke={activeNightMode ? "#14b8a6" : "#0f766e"} strokeWidth="2" strokeDasharray="6 6" className="animate-[pulse_3s_ease-in-out_infinite]" />
+          );
+        })}
+        {/* Central Hub Ring */}
+        <circle cx={windowSize.width * currentDungeon.spawnPoint.rx} cy={windowSize.height * currentDungeon.spawnPoint.ry} 
+                r="40" fill="none" stroke={activeNightMode ? "#14b8a6" : "#0f766e"} strokeWidth="2" className="animate-[spin_10s_linear_infinite]" strokeDasharray="15 10"/>
+      </svg>
 
       {/* 3. ATMOSPHERIC CLOUDS */}
-      {config.weatherEffects && (envData.weatherType === 'CLOUDY' || envData.weatherType === 'RAIN') && (
+      {(activeWeather === 'CLOUDY' || activeWeather === 'RAIN') && (
         <div className="absolute inset-0 pointer-events-none z-10 opacity-40 overflow-hidden">
-          <div className="absolute top-20 left-10 w-64 h-20 bg-white rounded-full blur-xl opacity-50 animate-[slide_20s_linear_infinite]"></div>
-          <div className="absolute top-40 right-20 w-96 h-24 bg-white rounded-full blur-xl opacity-40 animate-[slide_35s_linear_infinite_reverse]"></div>
+          <div className={`absolute top-20 left-10 w-64 h-20 ${activeNightMode ? 'bg-slate-300' : 'bg-slate-500'} rounded-full blur-xl opacity-50 animate-[slide_20s_linear_infinite]`}></div>
+          <div className={`absolute top-40 right-20 w-96 h-24 ${activeNightMode ? 'bg-slate-300' : 'bg-slate-500'} rounded-full blur-xl opacity-40 animate-[slide_35s_linear_infinite_reverse]`}></div>
         </div>
       )}
 
       {/* 4. TRUE RAIN RENDERING */}
       <div className="absolute inset-0 pointer-events-none z-40 overflow-hidden">
         {renderState.rain.map(r => (
-          <div key={r.id} className="absolute w-[2px] bg-blue-300/70 rounded-full rotate-12"
+          <div key={r.id} className="absolute w-[2px] bg-blue-400/70 rounded-full rotate-12"
                style={{ left: r.x, top: r.y, height: r.length }} />
         ))}
       </div>
 
       {/* 5. UI HUD */}
-      <div className="absolute top-6 left-6 z-50 flex flex-col gap-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] pointer-events-none">
-        <div className="text-white font-bold tracking-widest uppercase text-3xl drop-shadow-[0_0_8px_currentColor]">{currentDungeon.name}</div>
-        <div className="flex gap-4 text-slate-200 text-sm bg-black/50 px-3 py-1 rounded-md border border-slate-600 w-fit backdrop-blur-sm">
-           <span>SYS_TIME: <span className="text-teal-400">{envData.timeString}</span></span>
-           <span>ATMOSPHERE: <span className="text-teal-400">{envData.weatherType}</span></span>
+      <div className="absolute top-6 left-6 z-50 flex flex-col gap-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)] pointer-events-none">
+        <div className={`font-bold tracking-widest uppercase text-3xl drop-shadow-[0_0_8px_currentColor] ${activeNightMode ? 'text-white' : 'text-slate-900'}`}>
+          {currentDungeon.name}
+        </div>
+        <div className={`flex gap-4 text-sm px-3 py-1 rounded-md border w-fit backdrop-blur-sm ${activeNightMode ? 'bg-black/50 text-slate-200 border-slate-600' : 'bg-white/50 text-slate-800 border-slate-300'}`}>
+           <span>SYS_TIME: <span className="text-teal-500 font-bold">{envData.timeString}</span></span>
+           <span>ATMOSPHERE: <span className="text-teal-500 font-bold">{activeWeather}</span></span>
         </div>
       </div>
 
@@ -390,40 +410,30 @@ export default function App() {
           else if (t.type === 'INFO_BOARD' || t.type === 'CONTACT_INFO') hexColor = '#3b82f6';
           
           return (
-            <div key={t.id} className="absolute flex items-center justify-center transition-transform hover:scale-110"
+            <div key={t.id} className="absolute flex flex-col items-center justify-center transition-transform hover:scale-110"
                  style={{ width: t.radius * 2, height: t.radius * 2, left: absX - t.radius, top: absY - t.radius, zIndex: proximityScale > 1.2 ? 25 : 10 }}>
               <ArcanePortalSprite colorHex={hexColor} scale={proximityScale} />
+              {/* Optional Portal Labels underneath */}
+              <span className={`absolute -bottom-8 whitespace-nowrap text-xs tracking-widest font-bold ${activeNightMode ? 'text-slate-400' : 'text-slate-600'} opacity-50`}>{t.label}</span>
             </div>
           );
         })}
 
-        {/* Decor Renderer */}
-        {currentDungeon.decor && currentDungeon.decor.map(d => {
-          const absX = d.rx * windowSize.width;
-          const absY = d.ry * windowSize.height;
-          return (
-            <div key={d.id} className="absolute text-slate-500/30 text-6xl pointer-events-none" style={{ left: absX, top: absY }}>
-               {d.type === 'SERVER_RACK' ? '🖧' : d.type === 'PILLAR' ? '🏛️' : '✧'}
-            </div>
-          )
-        })}
-
         {/* Dust Particles */}
         {renderState.particles.map(p => (
-          <div key={p.id} className="absolute w-2 h-2 bg-slate-200 rounded-full shadow-[0_0_5px_white]" style={{ left: p.x, top: p.y, opacity: p.life }} />
+          <div key={p.id} className={`absolute w-2 h-2 rounded-full shadow-[0_0_5px_currentColor] ${activeNightMode ? 'bg-slate-200 text-white' : 'bg-slate-500 text-slate-500'}`} style={{ left: p.x, top: p.y, opacity: p.life }} />
         ))}
 
         {/* PLAYER SPRITE GROUP */}
         <div className="absolute w-16 h-16 transition-none z-30" style={{ left: renderState.x - 32, top: renderState.y - 32 }}>
           
-          {/* Faked Dynamic Ground Shadow */}
           <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-12 h-4 bg-black/40 blur-[4px] rounded-[100%] scale-y-50"></div>
 
           {easterEggActive ? (
             <div className="relative w-full h-full animate-bounce">
               <SacabambaspisSprite />
-              {/* Floating "Hire Me" Hologram */}
-              <div className="absolute -top-10 left-1/2 -translate-x-1/2 text-cyan-300 font-black tracking-widest text-sm whitespace-nowrap animate-pulse drop-shadow-[0_0_5px_currentColor]">
+              {/* FIXED HIRE ME: Moved much higher up (-top-24) and given high z-index */}
+              <div className="absolute -top-24 left-1/2 -translate-x-1/2 text-cyan-300 font-black tracking-widest text-2xl whitespace-nowrap animate-pulse drop-shadow-[0_0_10px_currentColor] z-50">
                 &lt; HIRE ME /&gt;
               </div>
             </div>
@@ -431,13 +441,12 @@ export default function App() {
             <PlayerSprite />
           )}
           
-          {/* Orbiting Familiars */}
           {EQUIPPED_SKILLS.map(skill => {
             const x = Math.cos(renderState.orbitAngle + skill.offset) * 85; 
             const y = Math.sin(renderState.orbitAngle + skill.offset) * 85; 
             return (
               <motion.div key={skill.id} className={`absolute w-10 h-10 rounded-full bg-black/90 border-2 flex items-center justify-center ${skill.color} shadow-[0_0_15px_currentColor]`}
-                   style={{ left: 12 + x, top: 12 + y }} title={skill.name} whileHover={{ scale: 1.3, zIndex: 50 }}>
+                   style={{ left: 12 + x, top: 12 + y, zIndex: 10 }} title={skill.name} whileHover={{ scale: 1.3, zIndex: 50 }}>
                 {skill.icon}
               </motion.div>
             );
@@ -446,34 +455,43 @@ export default function App() {
       </div>
 
       {/* BOTTOM LEFT: CONTROL HINTS */}
-      <div className="absolute bottom-6 left-6 z-50 pointer-events-none opacity-60 text-xs font-bold tracking-[0.1em] border-l-2 border-teal-500/50 pl-3">
-        <div className="flex flex-col gap-1 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-          <p className="text-white"><span className="text-teal-400">[WASD]</span> MOVE SYSTEM</p>
-          <p className="text-white"><span className="text-teal-400">[F]</span> ACCESS TERMINAL</p>
-          <p className="text-white"><span className="text-teal-400">[ESC]</span> CLOSE UI</p>
+      <div className={`absolute bottom-6 left-6 z-50 pointer-events-none opacity-60 text-xs font-bold tracking-[0.1em] border-l-2 border-teal-500/50 pl-3 ${activeNightMode ? 'drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]' : ''}`}>
+        <div className="flex flex-col gap-1">
+          <p><span className="text-teal-500">[WASD]</span> MOVE SYSTEM</p>
+          <p><span className="text-teal-500">[F]</span> ACCESS TERMINAL</p>
+          <p><span className="text-teal-500">[ESC]</span> CLOSE UI</p>
         </div>
       </div>
 
-      {/* BOTTOM RIGHT: SYSTEM SETTINGS TRAY */}
-      <div className="absolute bottom-6 right-6 z-50 flex gap-3 drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">
+      {/* BOTTOM RIGHT: UPGRADED OVERRIDE TRAY */}
+      <div className="absolute bottom-6 right-6 z-50 flex gap-3 drop-shadow-[0_4px_4px_rgba(0,0,0,0.3)]">
         <button 
-          onClick={() => setConfig(prev => ({...prev, weatherEffects: !prev.weatherEffects}))}
-          className={`px-3 py-2 border ${config.weatherEffects ? 'border-sky-400 text-sky-400 bg-sky-900/40' : 'border-slate-600 text-slate-500 bg-black/40'} rounded-md hover:bg-white/10 transition-colors backdrop-blur-sm`}
+          onClick={cycleTheme}
+          className={`px-3 py-2 border rounded-md transition-colors backdrop-blur-sm text-xs font-bold
+            ${config.themeOverride !== 'AUTO' ? 'border-yellow-400 text-yellow-500 bg-yellow-900/20' : activeNightMode ? 'border-slate-600 text-slate-400 bg-black/40' : 'border-slate-400 text-slate-600 bg-white/60 hover:bg-white'}`}
+          title="Toggle Dark/Light Mode"
+        >
+          THEME: {config.themeOverride}
+        </button>
+        <button 
+          onClick={cycleWeather}
+          className={`px-3 py-2 border rounded-md transition-colors backdrop-blur-sm text-xs font-bold
+            ${config.weatherOverride !== 'AUTO' ? 'border-sky-400 text-sky-500 bg-sky-900/20' : activeNightMode ? 'border-slate-600 text-slate-400 bg-black/40' : 'border-slate-400 text-slate-600 bg-white/60 hover:bg-white'}`}
           title="Toggle Weather Effects"
         >
-          {config.weatherEffects ? '☁️ ON' : '☁️ OFF'}
+          WX: {config.weatherOverride}
         </button>
         <button 
           onClick={() => setConfig(prev => ({...prev, rotateSkills: !prev.rotateSkills}))}
-          className={`px-3 py-2 border ${config.rotateSkills ? 'border-teal-400 text-teal-400 bg-teal-900/40' : 'border-slate-600 text-slate-500 bg-black/40'} rounded-md hover:bg-white/10 transition-colors backdrop-blur-sm`}
-          title="Toggle Skill Orbit"
+          className={`px-3 py-2 border rounded-md transition-colors backdrop-blur-sm text-xs font-bold
+            ${config.rotateSkills ? 'border-teal-400 text-teal-500 bg-teal-900/20' : activeNightMode ? 'border-slate-600 text-slate-400 bg-black/40' : 'border-slate-400 text-slate-600 bg-white/60 hover:bg-white'}`}
         >
           {config.rotateSkills ? '🌀 ORBIT' : '🛑 FIXED'}
         </button>
         <button 
           onClick={() => setConfig(prev => ({...prev, muted: !prev.muted}))}
-          className={`px-3 py-2 border ${!config.muted ? 'border-purple-400 text-purple-400 bg-purple-900/40' : 'border-slate-600 text-slate-500 bg-black/40'} rounded-md hover:bg-white/10 transition-colors backdrop-blur-sm`}
-          title="Toggle Audio"
+          className={`px-3 py-2 border rounded-md transition-colors backdrop-blur-sm text-xs font-bold
+            ${!config.muted ? 'border-purple-400 text-purple-500 bg-purple-900/20' : activeNightMode ? 'border-slate-600 text-slate-400 bg-black/40' : 'border-slate-400 text-slate-600 bg-white/60 hover:bg-white'}`}
         >
           {!config.muted ? '🔊 AUDIO' : '🔇 MUTE'}
         </button>
@@ -489,13 +507,12 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* --- CRASH-FREE UI OVERLAYS (MODALS) --- */}
-      
+      {/* --- UI MODALS (Unchanged logic, just dynamically applying dark/light backgrounds) --- */}
       {/* 1. Hacking Modal */}
       <AnimatePresence>
         {uiState === 'HACKING' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/95 z-50 p-10 flex flex-col justify-end border-[8px] border-slate-900 overflow-hidden">
+            className="absolute inset-0 bg-black/95 z-50 p-10 flex flex-col justify-end border-[8px] border-slate-900 overflow-hidden text-white">
              <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%] z-50 opacity-50"></div>
              <div className="text-teal-500 mb-6 font-bold text-2xl z-40">&gt; SYSTEM BREACH INITIATED...</div>
              <div className="space-y-3 z-40">
@@ -514,7 +531,7 @@ export default function App() {
       <AnimatePresence>
         {uiState === 'VIEW_PROJECT' && activeProject && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
-            className="absolute inset-0 bg-slate-900/95 backdrop-blur z-50 p-12 border-[16px] border-slate-800 flex flex-col">
+            className="absolute inset-0 bg-slate-900/95 backdrop-blur z-50 p-12 border-[16px] border-slate-800 flex flex-col text-white">
             <div className="flex justify-between items-end border-b-2 border-slate-700 pb-4 mb-6">
               <div>
                 <h2 className="text-5xl text-teal-400 font-bold uppercase drop-shadow-[0_0_10px_rgba(45,212,191,0.5)]">{activeProject.title}</h2>
@@ -575,7 +592,7 @@ export default function App() {
       <AnimatePresence>
         {uiState === 'VIEW_GITHUB' && (
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-            className="absolute inset-0 bg-slate-950/95 backdrop-blur z-50 flex items-center justify-center p-8 border-[12px] border-green-900/50">
+            className="absolute inset-0 bg-slate-950/95 backdrop-blur z-50 flex items-center justify-center p-8 border-[12px] border-green-900/50 text-white">
             <div className="w-full max-w-3xl bg-black border-4 border-slate-800 p-10 shadow-[0_0_80px_rgba(34,197,94,0.2)] rounded-lg font-mono">
               <div className="flex justify-between border-b-2 border-slate-800 pb-6 mb-8">
                 <h2 className="text-4xl text-green-400 font-bold drop-shadow-[0_0_10px_rgba(34,197,94,0.5)]">LIVE REPOSITORY RACK</h2>
@@ -610,7 +627,7 @@ export default function App() {
       <AnimatePresence>
         {uiState === 'VIEW_INFO' && activeInfo && (
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-            className="absolute inset-0 bg-blue-950/95 backdrop-blur z-50 p-12 border-[16px] border-blue-900 flex flex-col">
+            className="absolute inset-0 bg-blue-950/95 backdrop-blur z-50 p-12 border-[16px] border-blue-900 flex flex-col text-white">
             <div className="flex justify-between border-b-2 border-blue-700 pb-6 mb-8 mt-4">
               <h2 className="text-5xl text-blue-400 font-bold uppercase drop-shadow-[0_0_10px_rgba(96,165,250,0.5)]">{activeInfo.title}</h2>
               <button onClick={closeUI} className="text-3xl text-slate-500 hover:text-red-500 font-bold transition-colors">ESC / [X]</button>
@@ -641,7 +658,7 @@ export default function App() {
       <AnimatePresence>
         {uiState === 'VIEW_CONTACT' && (
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-            className="absolute inset-0 bg-purple-950/95 backdrop-blur z-50 flex items-center justify-center p-8 border-[12px] border-purple-900/50">
+            className="absolute inset-0 bg-purple-950/95 backdrop-blur z-50 flex items-center justify-center p-8 border-[12px] border-purple-900/50 text-white">
             <div className="w-full max-w-2xl bg-black border-4 border-purple-700 p-10 rounded-lg shadow-[0_0_60px_rgba(168,85,247,0.3)]">
               <div className="flex justify-between border-b-2 border-purple-800 pb-6 mb-8">
                 <h2 className="text-4xl text-purple-400 font-bold uppercase drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]">Contact Uplink</h2>
