@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+* {
+  image-rendering: pixelated;
+}
+
+body {
+  background-color: black;
+  margin: 0;
+}
