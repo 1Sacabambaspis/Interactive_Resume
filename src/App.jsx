@@ -43,13 +43,24 @@ const PlayerSprite = () => (
   </svg>
 );
 
+const SacabambaspisSprite = () => (
+  <svg viewBox="0 0 100 50" className="w-full h-full drop-shadow-[0_0_15px_rgba(56,189,248,0.8)]">
+    <ellipse cx="50" cy="25" rx="45" ry="20" fill="#94a3b8" />
+    <ellipse cx="50" cy="22" rx="40" ry="15" fill="#cbd5e1" />
+    <circle cx="85" cy="20" r="3" fill="#0f172a" />
+    <circle cx="85" cy="30" r="3" fill="#0f172a" />
+    <path d="M 90 20 Q 95 25 90 30" fill="none" stroke="#0f172a" strokeWidth="2" />
+    <polygon points="5,25 15,10 20,25" fill="#64748b" />
+    <polygon points="5,25 15,40 20,25" fill="#64748b" />
+  </svg>
+);
+
 export default function App() {
-  // CRITICAL FIX: The config hook is now safely inside the component!
   const [config, setConfig] = useState({
     rotateSkills: true,
     weatherEffects: true,
     particles: true,
-    muted: true // Set to true by default to prevent browser auto-play warnings
+    muted: true 
   });
 
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -65,7 +76,21 @@ export default function App() {
   const [githubCache, setGithubCache] = useState(null);
   const [isFetchingGithub, setIsFetchingGithub] = useState(false);
 
-  // Safely play sounds if the user has unmuted the app
+  // Audio Engine Refs
+  const ambientAudioRef = useRef(null);
+
+  useEffect(() => {
+    if (!config.muted && !ambientAudioRef.current) {
+      ambientAudioRef.current = new Audio('/audio/ambient_loop.mp3');
+      ambientAudioRef.current.loop = true;
+      ambientAudioRef.current.volume = 0.1;
+      ambientAudioRef.current.play().catch(() => {});
+    } else if (config.muted && ambientAudioRef.current) {
+      ambientAudioRef.current.pause();
+      ambientAudioRef.current = null;
+    }
+  }, [config.muted]);
+
   const playSfx = (file, volume = 0.3) => {
     if (config.muted) return;
     const sfx = new Audio(`/audio/${file}.mp3`);
@@ -93,7 +118,7 @@ export default function App() {
     setUiState('EXPLORING');
     setActiveProject(null);
     setActiveInfo(null);
-    playSfx('close', 0.2); // Optional sound effect for closing
+    playSfx('close', 0.2); 
   };
 
   useEffect(() => {
@@ -171,12 +196,12 @@ export default function App() {
     setUiState('HACKING');
     setHackingLogs([]);
     for (let i = 0; i < HACKING_LOG_TEMPLATES.length; i++) {
-      playSfx('typing', 0.2); // Play typing sound per log
+      playSfx('typing', 0.2); 
       await new Promise(res => setTimeout(res, 250)); 
       setHackingLogs(prev => [...prev, HACKING_LOG_TEMPLATES[i]]);
     }
     await new Promise(res => setTimeout(res, 400)); 
-    playSfx('success', 0.4); // Access granted sound
+    playSfx('success', 0.4); 
     setActiveProject(ProjectRegistry[projectId]);
     setUiState('VIEW_PROJECT');
   };
@@ -227,7 +252,6 @@ export default function App() {
     p.vx *= p.friction; p.vy *= p.friction;
     p.x += p.vx; p.y += p.vy;
 
-    // Conditionally render footstep particles
     if (config.particles && isMoving && Math.random() > 0.6) {
       particlesRef.current.push({ id: Math.random(), x: p.x + (Math.random() * 30 - 15), y: p.y + 25, life: 1.0 });
     }
@@ -235,7 +259,6 @@ export default function App() {
       part.life -= 0.05; part.y -= 0.5; return part;
     });
 
-    // Conditionally render weather physics
     if (config.weatherEffects && envData.weatherType === 'RAIN') {
       if (Math.random() > 0.2) { 
         rainRef.current.push({ id: Math.random(), x: Math.random() * windowSize.width, y: -20, speed: 15 + Math.random() * 10, length: 10 + Math.random() * 20 });
@@ -252,7 +275,6 @@ export default function App() {
     if (p.y < 40) { p.y = 40; if (p.vy < -3) cam.trauma = 0.3; p.vy = 0; }
     if (p.y > windowSize.height - 40) { p.y = windowSize.height - 40; if (p.vy > 3) cam.trauma = 0.3; p.vy = 0; }
 
-    // Settings Toggle: Spin or track behind player
     if (config.rotateSkills) {
       p.orbitAngle += 0.05;
     }
@@ -291,7 +313,6 @@ export default function App() {
   };
 
   useEffect(() => {
-    // We add 'config' to the dependency array so the game loop respects toggles instantly
     animationRef.current = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animationRef.current);
   }, [uiState, currentDungeon, windowSize, envData.weatherType, config]); 
@@ -314,7 +335,21 @@ export default function App() {
         )}
       </div>
 
-      {/* 2. ATMOSPHERIC CLOUDS (Parallax) conditionally rendered by settings */}
+      {/* 2. DECORATIVE LIGHTING ORBS */}
+      <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
+        {[1, 2, 3, 4, 5].map(orb => (
+          <div key={orb} 
+               className="absolute w-32 h-32 bg-teal-500/10 rounded-full blur-2xl mix-blend-screen"
+               style={{
+                 left: `${Math.random() * 100}%`,
+                 top: `${Math.random() * 100}%`,
+                 animation: `slide ${20 + Math.random() * 20}s linear infinite alternate${Math.random() > 0.5 ? '-reverse' : ''}`
+               }} 
+          />
+        ))}
+      </div>
+
+      {/* 3. ATMOSPHERIC CLOUDS */}
       {config.weatherEffects && (envData.weatherType === 'CLOUDY' || envData.weatherType === 'RAIN') && (
         <div className="absolute inset-0 pointer-events-none z-10 opacity-40 overflow-hidden">
           <div className="absolute top-20 left-10 w-64 h-20 bg-white rounded-full blur-xl opacity-50 animate-[slide_20s_linear_infinite]"></div>
@@ -322,7 +357,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 3. TRUE RAIN RENDERING */}
+      {/* 4. TRUE RAIN RENDERING */}
       <div className="absolute inset-0 pointer-events-none z-40 overflow-hidden">
         {renderState.rain.map(r => (
           <div key={r.id} className="absolute w-[2px] bg-blue-300/70 rounded-full rotate-12"
@@ -330,7 +365,7 @@ export default function App() {
         ))}
       </div>
 
-      {/* 4. UI HUD */}
+      {/* 5. UI HUD */}
       <div className="absolute top-6 left-6 z-50 flex flex-col gap-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] pointer-events-none">
         <div className="text-white font-bold tracking-widest uppercase text-3xl drop-shadow-[0_0_8px_currentColor]">{currentDungeon.name}</div>
         <div className="flex gap-4 text-slate-200 text-sm bg-black/50 px-3 py-1 rounded-md border border-slate-600 w-fit backdrop-blur-sm">
@@ -339,22 +374,20 @@ export default function App() {
         </div>
       </div>
 
-      {/* 5. GAME ENTITIES */}
+      {/* 6. GAME ENTITIES */}
       <div className="absolute inset-0 z-20">
         
-        {/* Dynamic Sprited Portals with Proximity Scaling */}
+        {/* Dynamic Sprited Portals */}
         {currentDungeon.triggers.map(t => {
           const absX = t.rx * windowSize.width;
           const absY = t.ry * windowSize.height;
-          
-          // Calculate distance from player for dynamic glow/scaling
           const dist = Math.sqrt(Math.pow(renderState.x - absX, 2) + Math.pow(renderState.y - absY, 2));
-          const proximityScale = Math.max(1, 1.5 - dist / 300); // Scales up as you get closer
+          const proximityScale = Math.max(1, 1.5 - dist / 300);
           
-          let hexColor = '#14b8a6'; // teal
-          if (t.type === 'DUNGEON_EXIT') hexColor = '#a855f7'; // purple
-          else if (t.type === 'GITHUB_RACK' || t.type === 'EXTERNAL_LINK') hexColor = '#22c55e'; // green
-          else if (t.type === 'INFO_BOARD' || t.type === 'CONTACT_INFO') hexColor = '#3b82f6'; // blue
+          let hexColor = '#14b8a6';
+          if (t.type === 'DUNGEON_EXIT') hexColor = '#a855f7';
+          else if (t.type === 'GITHUB_RACK' || t.type === 'EXTERNAL_LINK') hexColor = '#22c55e';
+          else if (t.type === 'INFO_BOARD' || t.type === 'CONTACT_INFO') hexColor = '#3b82f6';
           
           return (
             <div key={t.id} className="absolute flex items-center justify-center transition-transform hover:scale-110"
@@ -364,7 +397,7 @@ export default function App() {
           );
         })}
 
-        {/* Decor Renderer (To fill empty space if added to dungeons.js) */}
+        {/* Decor Renderer */}
         {currentDungeon.decor && currentDungeon.decor.map(d => {
           const absX = d.rx * windowSize.width;
           const absY = d.ry * windowSize.height;
@@ -380,9 +413,23 @@ export default function App() {
           <div key={p.id} className="absolute w-2 h-2 bg-slate-200 rounded-full shadow-[0_0_5px_white]" style={{ left: p.x, top: p.y, opacity: p.life }} />
         ))}
 
-        {/* Player Sprite */}
+        {/* PLAYER SPRITE GROUP */}
         <div className="absolute w-16 h-16 transition-none z-30" style={{ left: renderState.x - 32, top: renderState.y - 32 }}>
-          <PlayerSprite />
+          
+          {/* Faked Dynamic Ground Shadow */}
+          <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-12 h-4 bg-black/40 blur-[4px] rounded-[100%] scale-y-50"></div>
+
+          {easterEggActive ? (
+            <div className="relative w-full h-full animate-bounce">
+              <SacabambaspisSprite />
+              {/* Floating "Hire Me" Hologram */}
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 text-cyan-300 font-black tracking-widest text-sm whitespace-nowrap animate-pulse drop-shadow-[0_0_5px_currentColor]">
+                &lt; HIRE ME /&gt;
+              </div>
+            </div>
+          ) : (
+            <PlayerSprite />
+          )}
           
           {/* Orbiting Familiars */}
           {EQUIPPED_SKILLS.map(skill => {
