@@ -469,14 +469,19 @@ export default function App() {
             else if (t.type === 'GITHUB_RACK' || t.type === 'EXTERNAL_LINK') hexColor = '#22c55e';
             else if (t.type === 'INFO_BOARD' || t.type === 'CONTACT_INFO') hexColor = '#3b82f6';
             
-            return (
-              <div key={t.id} className="absolute flex flex-col items-center justify-center pointer-events-auto"
-                   style={{ width: t.radius * 2, height: t.radius * 2, left: absX - t.radius, top: absY - t.radius, zIndex: proximityScale > 1.2 ? 25 : 10 }}>
-                {/* NEW THREE.JS ORB PORTAL INSTANCE */}
-                <PortalOrb colorHex={hexColor} scale={proximityScale} />
-                <span className={`absolute -bottom-8 whitespace-nowrap text-xs tracking-widest font-bold ${activeNightMode ? 'text-slate-400' : 'text-slate-600'} opacity-50`}>{t.label}</span>
-              </div>
-            );
+           
+              const appBgHex = activeNightMode ? '#020617' : '#e2e8f0';
+
+              return (
+                <div key={t.id} className="absolute flex flex-col items-center justify-center pointer-events-auto"
+                    style={{ width: t.radius * 2, height: t.radius * 2, left: absX - t.radius, top: absY - t.radius, zIndex: proximityScale > 1.2 ? 25 : 10 }}>
+                  
+                  {/* Notice we added bgColorHex={appBgHex} */}
+                  <PortalOrb colorHex={hexColor} bgColorHex={appBgHex} scale={proximityScale} />
+                  
+                  <span className={`absolute -bottom-8 whitespace-nowrap text-xs tracking-widest font-bold ${activeNightMode ? 'text-slate-400' : 'text-slate-600'} opacity-50`}>{t.label}</span>
+                </div>
+              );
           })}
 
           {renderState.enemies.map(enemy => (

@@ -1,20 +1,20 @@
+// src/PortalOrb.jsx
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-export default function PortalOrb({ colorHex, scale }) {
+export default function PortalOrb({ colorHex, bgColorHex, scale }) {
   const mountRef = useRef(null);
+  const materialRef = useRef(null);
 
   useEffect(() => {
     const scene = new THREE.Scene();
-    // Use an orthographic camera to keep the portal size consistent in your 2D space
     const camera = new THREE.OrthographicCamera(-4, 4, 4, -4, 0.1, 100);
     camera.position.z = 10;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    // Keep the canvas small to match the portal radius
-    renderer.setSize(100, 100);
+    renderer.setSize(120, 120); // Slightly larger canvas to fit the swirling edges
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    mountRef.current.appendChild(renderer.domElement);
+    if (mountRef.current) mountRef.current.appendChild(renderer.domElement);
 
     const vertexShader = `
       varying vec2 vUv;
@@ -37,7 +37,6 @@ export default function PortalOrb({ colorHex, scale }) {
       varying vec3 vNormal;
       varying vec3 vPosition;
 
-      // Simplex noise functions omitted for brevity (insert the snoise block from the Mars orb here)
       vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
       vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
       vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
@@ -85,25 +84,20 @@ export default function PortalOrb({ colorHex, scale }) {
       void main() {
         vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
         float lightIntensity = dot(vNormal, lightDir);
-        float angle = time * 0.5;
+        float angle = time * 0.4;
         mat3 rotY = mat3(cos(angle), 0.0, sin(angle), 0.0, 1.0, 0.0, -sin(angle), 0.0, cos(angle));
-        vec3 noisePos = rotY * vPosition * 2.0;
+        vec3 noisePos = rotY * vPosition * 1.8;
         
         float noiseVal = snoise(noisePos);
-        vec3 finalColor = colorBase;
         
-        if (noiseVal > 0.1) {
+        // BASE color exactly matches the HTML background, making it "invisible"
+        vec3 finalColor = colorBase; 
+        
+        // Swirling energy lines colored by the specific trigger color
+        if (noiseVal > 0.05) {
             finalColor = colorHighlight;
-        } else if (lightIntensity < -0.2) {
-            finalColor = mix(colorBase, colorShadow, 0.8);
-        }
-        
-        // High-tech stipple edge effect
-        float viewDot = dot(normalize(vNormal), vec3(0,0,1));
-        if (viewDot < 0.4 && viewDot > 0.0) {
-             if (mod(gl_FragCoord.x + gl_FragCoord.y, 4.0) < 2.0) {
-                finalColor = colorShadow;
-             }
+        } else if (lightIntensity < -0.1) {
+            finalColor = mix(colorBase, colorShadow, 0.6);
         }
         
         gl_FragColor = vec4(finalColor, 1.0);
@@ -112,19 +106,14 @@ export default function PortalOrb({ colorHex, scale }) {
 
     const uniforms = {
       time: { value: 0 },
-      colorBase: { value: new THREE.Color(colorHex) },
-      colorHighlight: { value: new THREE.Color('#ffffff') },
-      colorShadow: { value: new THREE.Color('#0f172a') } // Slate 900
+      colorBase: { value: new THREE.Color(bgColorHex) },
+      colorHighlight: { value: new THREE.Color(colorHex) },
+      colorShadow: { value: new THREE.Color(colorHex).multiplyScalar(0.3) } // Dynamic dark shadow based on the core color
     };
 
-    const geometry = new THREE.IcosahedronGeometry(3, 16);
-    const material = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      uniforms,
-      transparent: true,
-    });
-
+    const geometry = new THREE.IcosahedronGeometry(3.5, 30);
+    const material = new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms, transparent: true });
+    materialRef.current = material;
     const sphere = new THREE.Mesh(geometry, material);
     scene.add(sphere);
 
@@ -140,18 +129,27 @@ export default function PortalOrb({ colorHex, scale }) {
 
     return () => {
       cancelAnimationFrame(animationId);
-      mountRef.current?.removeChild(renderer.domElement);
+      if (mountRef.current && renderer.domElement) mountRef.current.removeChild(renderer.domElement);
       geometry.dispose();
       material.dispose();
       renderer.dispose();
     };
-  }, [colorHex]);
+  }, []); // Run setup once
+
+  // Dynamically update colors when theme overrides happen without re-mounting the whole canvas
+  useEffect(() => {
+    if(materialRef.current) {
+       materialRef.current.uniforms.colorBase.value.set(bgColorHex);
+       materialRef.current.uniforms.colorHighlight.value.set(colorHex);
+       materialRef.current.uniforms.colorShadow.value.set(new THREE.Color(colorHex).multiplyScalar(0.3));
+    }
+  }, [bgColorHex, colorHex]);
 
   return (
     <div 
       ref={mountRef} 
       style={{ transform: `scale(${scale})`, transition: 'transform 0.2s ease-out' }}
-      className="pointer-events-none drop-shadow-[0_0_15px_currentColor]"
+      className="pointer-events-none drop-shadow-[0_0_20px_currentColor] -ml-[10px] -mt-[10px]"
     />
   );
 }
