@@ -11,6 +11,8 @@ const HACKING_LOG_TEMPLATES = [
   "Negotiating TLS handshake...", "Resolving identity provider...", "Injecting signed credentials...", "Validating checksum blocks..."
 ];
 
+const [isBooting, setIsBooting] = useState(true);
+
 const EQUIPPED_SKILLS = [
   { id: 'python', name: 'Python', icon: <SiPython size={18} />, color: 'text-yellow-400 border-yellow-400', offset: (Math.PI * 2) * (0 / 7) },
   { id: 'cpp', name: 'C++', icon: <SiCplusplus size={18} />, color: 'text-blue-500 border-blue-500', offset: (Math.PI * 2) * (1 / 7) },
@@ -510,7 +512,7 @@ export default function App() {
           return (
             <div key={t.id} className="absolute flex flex-col items-center justify-center transition-transform hover:scale-110 pointer-events-auto"
                  style={{ width: t.radius * 2, height: t.radius * 2, left: absX - t.radius, top: absY - t.radius, zIndex: proximityScale > 1.2 ? 25 : 10 }}>
-              <ArcanePortalSprite colorHex={hexColor} scale={proximityScale} />
+              <PortalOrb colorHex={hexColor} scale={proximityScale} />
               <span className={`absolute -bottom-8 whitespace-nowrap text-xs tracking-widest font-bold ${activeNightMode ? 'text-slate-400' : 'text-slate-600'} opacity-50`}>{t.label}</span>
             </div>
           );
