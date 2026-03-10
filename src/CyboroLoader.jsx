@@ -12,29 +12,37 @@ export default function CyboroLoader({ onComplete }) {
       setProgress(intervals[step]);
       if (step === intervals.length - 1) {
         clearInterval(bootTimer);
-        setTimeout(onComplete, 1500); // Hold at 100% for dramatic effect, then unmount
+        setTimeout(onComplete, 1500); // Hold at 100% before fading out
       }
       step++;
-    }, 600);
+    }, 500);
 
     return () => clearInterval(bootTimer);
-  }, [onComplete]);
+    
+    
+  }, []); 
 
   return (
     <motion.div 
       exit={{ opacity: 0, filter: 'blur(10px)', scale: 1.1 }} 
       transition={{ duration: 0.8, ease: "easeInOut" }}
-      className="fixed inset-0 z-[100] bg-slate-100 flex items-center justify-center font-mono cursor-wait"
+      className="fixed inset-0 z-[100] bg-[#F4F4F2] flex items-center justify-center font-mono cursor-wait"
     >
       {/* Background Noise & Grid */}
       <div className="absolute inset-0 bg-[radial-gradient(#0a0a0a_1px,transparent_1px)] bg-[length:20px_20px] opacity-10"></div>
       
       {/* UI Framing */}
-      <div className="absolute top-8 left-8 text-xs font-bold tracking-widest text-slate-500">SYS.ID: CYB-09X<br/>INITIATING SEQUENCE</div>
-      <div className="absolute bottom-8 right-8 text-right text-xs font-bold tracking-widest text-slate-500">VOL.<br/><span className="text-2xl text-slate-900">01</span></div>
+      <div className="absolute top-8 left-8 text-xs font-bold tracking-widest text-slate-500">
+        SYS.ID: CYB-09X<br/>
+        INITIATING SECURE CLOUD UPLINK...
+      </div>
+      <div className="absolute bottom-8 right-8 text-right text-xs font-bold tracking-widest text-slate-500">
+        VOL.<br/>
+        <span className="text-2xl text-slate-900">01</span>
+      </div>
       
       {/* Center Counter */}
-      <div className="text-slate-900 text-[15vw] font-serif italic leading-none flex items-start mix-blend-difference">
+      <div className="text-slate-900 text-[15vw] italic leading-none flex items-start mix-blend-difference font-bold">
         {progress}<span className="text-[4vw] mt-4">%</span>
       </div>
 
